@@ -23,7 +23,7 @@ class Node:
     def input_update(self, key, value):
         if key in self.inputMap.keys():
             temp_list = self.inputMap[key]
-            temp_list.add(value)
+            temp_list.append(value)
         else:
             temp_list = list()
             temp_list.append(value)
@@ -32,7 +32,7 @@ class Node:
     def output_update(self, key, value):
         if key in self.outputMap.keys():
             temp_list = self.outputMap[key]
-            temp_list.add(value)
+            temp_list.append(value)
         else:
             temp_list = list()
             temp_list.append(value)
