@@ -1,5 +1,5 @@
 from pyltp import SentenceSplitter
-sentenceSplitter=SentenceSplitter.split('小蝌蚪！牛逼')
+sentenceSplitter=SentenceSplitter.split('倘若工资增幅赛不过物价涨幅')
 print('\n'.join(sentenceSplitter))
 
 import os
@@ -16,7 +16,7 @@ cws_model_path=os.path.join(LTP_DATA_DIR,'cws.model')
 from pyltp import Segmentor
 segmentor = Segmentor()  # 初始化实例
 segmentor.load_with_lexicon(cws_model_path, 'data/xinchou_dict.txt') # 加载模型，第二个参数是您的外部词典文件路径
-words = segmentor.segment('精细的操纵人偶的能力是爱丽丝拥有的能力')
+words = segmentor.segment('为惠而浦的“人才生态系统”')
 print ('\t '.join(words))
 segmentor.release()
 

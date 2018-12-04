@@ -26,10 +26,14 @@ sequences = set()  # 分离出的句子组
 nodes = list()  # 分离出的词
 candidate = set()  # 候选词，候选词中的词是待扩展的词
 # right_tags = set(("ATT", "ADV"))
-right_tags = set(("ADT",))
+right_tags = set(("ATT",))
 left_tags = set(("RAD", "COO"))
 before_expend = []  # 前置扩展栈
 all_words = set()
+min_order = 1000
+right_part = ['n', 'nh', 'ni', 'nl', 'ns', 'nt', 'nz', 'v', 'm']
+# wrong_part_adj = ['r', 'm', 'p']
+wrong_part_first = ['r', 'q', 'p', 'u', 'v', 'm']
 
 
 # 或许我们根本不需要词的后置扩展，因为我们甚至不知道自己扩展的是什么词
@@ -54,12 +58,30 @@ def sentence_split(read_file):
             # 去除空行
             if sequence == '':
                 continue
-            second_sentences = re.split('(；|，)', sequence)
+            second_sentences = re.split('[:.（）、\s]', sequence)
             for second_sentence in second_sentences:
-                if len(second_sentence.strip()) == 1:
-                    continue
-                # print(second_sentence)
                 sequences.add(second_sentence)
+    #         second_sentences = re.split('(；|，|、|）|\.|\n|\?|？|！|\!|》|。)', sequence)
+    #         new_sents = []
+    #         # 分隔后是['第一章\u3000薪酬管理总论', '\n'的形式，所以要/2调整
+    #         for i in range(int(len(second_sentences) / 2)):
+    #             sent = second_sentences[2 * i] + second_sentences[2 * i + 1]
+    #             # print(sent)
+    #             new_sents.append(sent)
+    #         # 去空行
+    #         for li in new_sents:
+    #             if "\n" in li:
+    #                 for i in li.split("\n"):
+    #                     if len(li.strip()) <= 4:
+    #                         continue
+    #                     sequences.add(i)
+    #             else:
+    #                 if len(li.strip()) <= 4:
+    #                     continue
+    #                 sequences.add(li)
+    #         new_sents = []
+    # print(sequences)
+
     return "success"
 
 
@@ -84,7 +106,7 @@ def words_split():
         # 对句子中是否存在entity_words进行判断
         if has_entity(sequence):
             # 进行词扩展
-            temp_words = words_expanding()
+            temp_words = words_expanding_2()
             # print(temp_words)
             # 判断其是否是entity_words的扩充词
             temp_words = is_expanded(temp_words)
@@ -124,12 +146,17 @@ def parsing(words, postages):
     #     nodes[arcs[i].head].input_update(arcs[i].relation, nodes[i])
     for (node, arc) in zip(nodes, arcs):
         # ATT,ADV同等看待
-        if arc.relation == 'ADV' or arc.relation == 'ATT':
-            node.output_update('ADT', nodes[arc.head - 1])
-            nodes[arc.head - 1].input_update('ADT', node)
-        else:
-            node.output_update(arc.relation, nodes[arc.head - 1])
-            nodes[arc.head - 1].input_update(arc.relation, node)
+        # if arc.relation == 'ADV' or arc.relation == 'ATT':
+        #     node.output_update('ADT', nodes[arc.head - 1])
+        #     nodes[arc.head - 1].input_update('ADT', node)
+        # else:
+        #     node.output_update(arc.relation, nodes[arc.head - 1])
+        #     nodes[arc.head - 1].input_update(arc.relation, node)
+        # 增加限制，对于非修饰性词汇不将其放入到关系组中
+        # if node.part in wrong_part_adj and arc.relation is 'ATT':
+        #     continue
+        node.output_update(arc.relation, nodes[arc.head - 1])
+        nodes[arc.head - 1].input_update(arc.relation, node)
     # 结构化结束，打印输出
     # for node in nodes:
     #     node.print_self()
@@ -146,7 +173,7 @@ def has_entity(sequence):
     return boolean
 
 
-# 词扩展
+# 词扩展方法1
 def words_expanding():
     max_words = list()
     for node in nodes:
@@ -163,6 +190,59 @@ def words_expanding():
         if prefix is '':
             continue
         prefix = prefix + node.word
+        # 判断是否前缀已经在max_words中出现过了
+        boolean = False
+        for max_word in max_words:
+            if max_word.find(prefix) != -1:
+                boolean = True
+                break
+            # 双向比较
+            if prefix.find(max_word) != -1:
+                max_words.remove(max_word)
+                break
+        if boolean is False:
+            max_words.append(prefix)
+    return max_words
+
+
+def words_expanding_2():
+    max_words = list()
+    global min_order
+    for node in nodes:
+        if node.part not in right_part:
+            continue
+        for key, values in node.inputMap.items():
+            if key in right_tags:
+                # 方法2
+                for value in values:
+                    min_order = track_expend_2(value)
+                    min_order = min(int(min_order), value.order)
+        # 单词实现了words_expending
+        prefix = ''
+        # 通过flag_bool确保只有一次头舍
+        flag_bool = False
+        if int(min_order) < node.order:
+            for num in range(min_order, node.order):
+                if flag_bool is False:
+                    if nodes[num - 1].part in wrong_part_first:
+                        continue
+                    else:
+                        flag_bool = True
+                prefix = prefix + nodes[num - 1].word
+        min_order = 1000
+        # 前缀拼接
+        # print('prefix=' + prefix)
+        if prefix is '':
+            continue
+        prefix = prefix + node.word
+        # 判断是否需要在词尾加入符号
+        for key, values in node.inputMap.items():
+            if key == 'WP':
+                for value in values:
+                    if value.order == node.order + 1:
+                        prefix = prefix + value.word
+                        break
+
         # 判断是否前缀已经在max_words中出现过了
         boolean = False
         for max_word in max_words:
@@ -196,16 +276,30 @@ def track_expand(node):
             for value in reversed(values):
                 # before_expend.append(value.word)
                 track_expand(value)
-
     return before_expend
 
 
+def track_expend_2(node):
+    global min_order
+    # 只要找到最左边的ADT就压栈并遍历
+    for key, values in node.inputMap.items():
+        if key in right_tags:
+            for value in values:
+                min_order = track_expend_2(value)
+                min_order = min(int(min_order), value.order)
+    return min_order
+
+
 # 判断是否为扩展词的扩展
+# 如果只是符号扩展那么没有任何意义
 def is_expanded(words):
     final_words = list()
     for word in words:
         for candy in candidate:
-            if word.find(candy) != -1:
+            word=word.replace('“', '').replace('”', '')
+            if word.find(candy) != -1 and candy != word:
+                if (len(word) - len(candy)) > 7:
+                    continue
                 final_words.append(word)
                 break
     return final_words
@@ -221,10 +315,10 @@ if __name__ == '__main__':
     entity_file = open('../data/entity_word.txt', 'r', encoding='utf8')
     # 初始化操作
     initialize(entity_file)
-    read_file = open('../book/txt001.xhtml.txt', 'r', encoding='utf8')
+    read_file = open('../book/test.txt', 'r', encoding='utf8')
     # 句子抽取
     sentence_split(read_file)
     # 分词
     words_split()
     # 文件写入
-    write_files()
+    # write_files()
