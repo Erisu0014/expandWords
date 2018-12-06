@@ -1,8 +1,8 @@
 if __name__ == '__main__':
-    read_file=open("result/final.txt","r",encoding='utf8')
-    write_file=open("result/refinal.txt","w",encoding='utf8')
-    lines_seen=set()
-    count=0;
+    read_file = open("data2/expend_words.txt", "r", encoding='utf8')
+    write_file = open("data2/expend_words_removal.txt", "w", encoding='utf8')
+    lines_seen = set()
+    count = 0;
     for line in read_file:
         if line not in lines_seen:
             count += 1

@@ -33,7 +33,10 @@ all_words = set()
 min_order = 1000
 right_part = ['n', 'nh', 'ni', 'nl', 'ns', 'nt', 'nz', 'v', 'm']
 # wrong_part_adj = ['r', 'm', 'p']
-wrong_part_first = ['r', 'q', 'p', 'u', 'v', 'm']
+wrong_part_first = ['r', 'q', 'p', 'u', 'm', 'nd']
+# 词反转
+reverse_word_e = {'》': '《', '”': '“'}
+reverse_word_b = {'《': '》', '“': '”'}
 
 
 # 或许我们根本不需要词的后置扩展，因为我们甚至不知道自己扩展的是什么词
@@ -82,6 +85,7 @@ def sentence_split(read_file):
     #         new_sents = []
     # print(sequences)
 
+
     return "success"
 
 
@@ -110,13 +114,26 @@ def words_split():
             # print(temp_words)
             # 判断其是否是entity_words的扩充词
             temp_words = is_expanded(temp_words)
+            # 判断temp_words两边是否有符号（主要针对的是”“）
+            # 此处有bug，对于“xxxx”“aaaa”的形式无法判断
+            # 对temp_words中每一个word都进行判断
+            index = 0
+            for word in temp_words:
+                if word[0] == '“' and word[-1] == '”':
+                    word = word[1:]
+                    word = word[:-1]
+                temp_words[index] = word
+                index = index + 1
+            index = 0
             print('step' + str(count) + ':' + '\t'.join(temp_words))
             count = count + 1
             for temp_word in temp_words:
                 all_words.add(temp_word)
-                # nodes全部删除，候选词全部删除
+        # nodes全部删除，候选词全部删除
         nodes.clear()
         candidate.clear()
+    # sequences清空
+    sequences.clear()
     segmentor.release()
 
     return "success"
@@ -224,11 +241,18 @@ def words_expanding_2():
         if int(min_order) < node.order:
             for num in range(min_order, node.order):
                 if flag_bool is False:
-                    if nodes[num - 1].part in wrong_part_first:
+                    if nodes[num - 1].part in wrong_part_first or nodes[num - 1].word == '—':
                         continue
                     else:
                         flag_bool = True
                 prefix = prefix + nodes[num - 1].word
+            # 判断是否需要在词头添加信息,未进行是否为词前后符号的判断
+            if min_order >= 2:
+                temp_word = nodes[min_order - 2].word
+                if temp_word in reverse_word_b:
+                    # 可能要加入数量判断
+                    if prefix.find(reverse_word_b[temp_word]) != -1:
+                        prefix = nodes[min_order - 2].word + prefix
         min_order = 1000
         # 前缀拼接
         # print('prefix=' + prefix)
@@ -238,10 +262,17 @@ def words_expanding_2():
         # 判断是否需要在词尾加入符号
         for key, values in node.inputMap.items():
             if key == 'WP':
-                for value in values:
-                    if value.order == node.order + 1:
-                        prefix = prefix + value.word
-                        break
+                if len(values) > 1:
+                    # 双引号会有多个指向，注意
+                    for value in values:
+                        # 词尾
+                        if value.word in reverse_word_e.keys():
+                            temp_value = reverse_word_e[value.word]
+                        else:
+                            temp_value = value.word
+                        if value.order == node.order + 1 and prefix.find(temp_value) != -1:
+                            prefix = prefix + value.word
+                            break
 
         # 判断是否前缀已经在max_words中出现过了
         boolean = False
@@ -296,8 +327,8 @@ def is_expanded(words):
     final_words = list()
     for word in words:
         for candy in candidate:
-            word=word.replace('“', '').replace('”', '')
-            if word.find(candy) != -1 and candy != word:
+            word_temp = word.replace('“', '').replace('”', '')
+            if word_temp.find(candy) != -1 and candy != word_temp:
                 if (len(word) - len(candy)) > 7:
                     continue
                 final_words.append(word)
@@ -311,14 +342,28 @@ def write_files():
         file.write(word + "\n")
 
 
+def listdir(path, list_name):  # 传入存储的list
+    for file in os.listdir(path):
+        file_path = os.path.join(path, file)
+        if os.path.isdir(file_path):
+            listdir(file_path, list_name)
+        else:
+            list_name.append(file_path)
+
+
 if __name__ == '__main__':
     entity_file = open('../data/entity_word.txt', 'r', encoding='utf8')
     # 初始化操作
     initialize(entity_file)
-    read_file = open('../book/test.txt', 'r', encoding='utf8')
-    # 句子抽取
-    sentence_split(read_file)
-    # 分词
-    words_split()
+    # 文件夹下读取待扩展的文件路径
+    bookList = list()
+    listdir("D:/python/project/jiebademo/book", bookList)
+    for i in range(len(bookList)):
+        read_file = open(bookList[i], "r", encoding='utf-8')
+        # 句子抽取
+        sentence_split(read_file)
+        # 分词
+        words_split()
+
     # 文件写入
     # write_files()
