@@ -3,6 +3,7 @@
 1. jieba
 
    主要是利用了一些词性分词的词法规则进行的词扩展算法。
+   ![算法流程图](https://puu.sh/CqOak/8ee62e5949.png)
 
 2. pyltp
 
